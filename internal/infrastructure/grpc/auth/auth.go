@@ -37,7 +37,6 @@ func (s *serverAPI) Login(
 	ctx context.Context,
 	req *ssov1.LoginRequest,
 ) (*ssov1.LoginResponse, error) {
-
 	if err := validateLoginRequest(req, s.validate); err != nil {
 		var errMsgs []string
 		for _, err := range err {
@@ -54,7 +53,7 @@ func (s *serverAPI) Login(
 	})
 	if err != nil {
 		// TODO: add error handling
-		return nil, status.Error(codes.InvalidArgument, "invalid credentials")
+		return nil, status.Error(codes.Internal, "internal error")
 	}
 
 	return &ssov1.LoginResponse{
@@ -66,7 +65,6 @@ func (s *serverAPI) Register(
 	ctx context.Context,
 	req *ssov1.RegisterRequest,
 ) (*ssov1.RegisterResponse, error) {
-
 	if err := validateRegisterRequest(req, s.validate); err != nil {
 		var errMsgs []string
 		for _, err := range err {
@@ -82,7 +80,7 @@ func (s *serverAPI) Register(
 	})
 	if err != nil {
 		// TODO: add error handling
-		return nil, status.Error(codes.InvalidArgument, "invalid credentials")
+		return nil, status.Error(codes.Internal, "internal error")
 	}
 
 	return &ssov1.RegisterResponse{
@@ -94,7 +92,26 @@ func (s *serverAPI) IsAdmin(
 	ctx context.Context,
 	req *ssov1.IsAdminRequest,
 ) (*ssov1.IsAdminResponse, error) {
-	panic("implement me")
+	if err := validateIsAdminRequest(req, s.validate); err != nil {
+		var errMsgs []string
+		for _, err := range err {
+			errMsgs = append(errMsgs, err.Error())
+		}
+
+		return nil, status.Error(codes.InvalidArgument, strings.Join(errMsgs[:], ";"))
+	}
+
+	isAdmin, err := s.authService.IsAdmin(ctx, authservice.IsAdminDTO{
+		UserId: int(req.GetUserId()),
+	})
+	if err != nil {
+		// TODO: add error handling
+		return nil, status.Error(codes.Internal, "internal error")
+	}
+
+	return &ssov1.IsAdminResponse{
+		IsAdmin: isAdmin,
+	}, nil
 }
 
 func validateLoginRequest(req *ssov1.LoginRequest, validate *validator.Validate) []error {
@@ -129,6 +146,17 @@ func validateRegisterRequest(req *ssov1.RegisterRequest, validate *validator.Val
 	password := req.GetPassword()
 	if err := validate.Var(password, "required"); err != nil {
 		errs = append(errs, fmt.Errorf("invalid password"))
+	}
+
+	return errs
+}
+
+func validateIsAdminRequest(req *ssov1.IsAdminRequest, validate *validator.Validate) []error {
+	var errs []error
+
+	userId := req.GetUserId()
+	if err := validate.Var(userId, "required"); err != nil {
+		errs = append(errs, fmt.Errorf("invalid userId"))
 	}
 
 	return errs
