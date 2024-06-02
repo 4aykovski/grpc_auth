@@ -1,0 +1,13 @@
+env: "local"
+access_token_ttl: 86400s # 1day 
+refresh_token_ttl: 86400s # 1day
+postgres:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  database: "postgres"
+  sslmode: "disable"
+grpc:
+  host: "localhost"
+  port: 8888
+  timeout: 36000s # 10h
