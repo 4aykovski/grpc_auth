@@ -19,12 +19,12 @@ type Config struct {
 }
 
 type Postgres struct {
-	Host        string `env-required:"true" yaml:"host"`
-	Port        int    `env-required:"true" yaml:"port"`
-	User        string `env-required:"true" yaml:"user"`
-	Password    string `env-required:"true" env:"POSTGRES_PASSWORD"`
-	Database    string `env-required:"true" yaml:"database"`
-	SSLMode     string `env-required:"true" yaml:"sslmode"`
+	Host        string `env-required:"true" env:"PG_HOST"`
+	Port        int    `env-required:"true" env:"PG_PORT"`
+	User        string `env-required:"true" env:"PG_USER"`
+	Password    string `env-required:"true" env:"PG_PASS"`
+	Database    string `env-required:"true" env:"PG_DBNAME"`
+	SSLMode     string `env-required:"true" env:"PG_SSLMODE"`
 	DSNTemplate string
 }
 

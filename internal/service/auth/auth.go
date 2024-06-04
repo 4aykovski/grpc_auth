@@ -14,7 +14,10 @@ import (
 type userRepository interface {
 	SaveUser(ctx context.Context, user entity.User) (int64, error)
 	GetUser(ctx context.Context, email string) (entity.User, error)
-	IsAdmin(ctx context.Context, userId int) (bool, error)
+}
+
+type adminRepository interface {
+	GetAdmin(ctx context.Context, userId int) (entity.Admin, error)
 }
 
 type appRepository interface {
@@ -43,14 +46,16 @@ type hasher interface {
 type Service struct {
 	log *slog.Logger
 
-	userRepo userRepository
-	appRepo  appRepository
+	userRepo  userRepository
+	appRepo   appRepository
+	adminRepo adminRepository
 
 	tokenManager  tokenManager
 	secretManager secretManager
 	hasher        hasher
 
-	tokenTTL time.Duration
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
 }
 
 var (
@@ -65,19 +70,23 @@ func New(
 	log *slog.Logger,
 	userRepo userRepository,
 	appRepo appRepository,
+	adminRepo adminRepository,
 	tokenManager tokenManager,
 	secretManager secretManager,
 	hasher hasher,
-	tokenTTL time.Duration,
+	accessTokenTTL time.Duration,
+	refreshTokenTTL time.Duration,
 ) *Service {
 	return &Service{
-		log:           log,
-		userRepo:      userRepo,
-		appRepo:       appRepo,
-		tokenManager:  tokenManager,
-		secretManager: secretManager,
-		hasher:        hasher,
-		tokenTTL:      tokenTTL,
+		log:             log,
+		userRepo:        userRepo,
+		appRepo:         appRepo,
+		adminRepo:       adminRepo,
+		tokenManager:    tokenManager,
+		secretManager:   secretManager,
+		hasher:          hasher,
+		accessTokenTTL:  accessTokenTTL,
+		refreshTokenTTL: refreshTokenTTL,
 	}
 }
 
@@ -101,6 +110,7 @@ func (s *Service) Login(ctx context.Context, dto LoginDTO) (string, error) {
 
 		return "", fmt.Errorf("can't login user: %w", err)
 	}
+	s.log.Debug("user", slog.Int("user", int(user.ID)))
 
 	if ok := s.hasher.Check(dto.Password, user.PasswordHash); !ok {
 		return "", fmt.Errorf("can't login user: %w", ErrInvalidCredentials)
@@ -114,17 +124,19 @@ func (s *Service) Login(ctx context.Context, dto LoginDTO) (string, error) {
 
 		return "", fmt.Errorf("can't login user: %w", err)
 	}
+	s.log.Debug("app", slog.String("app", app.Name), slog.Int("appId", app.ID))
 
 	secret, err := s.secretManager.GetSecret(ctx, dto.AppId)
 	if err != nil {
 		return "", fmt.Errorf("can't login user: %w", err)
 	}
+	s.log.Debug("secret", slog.String("secret", secret))
 
 	token, err := s.tokenManager.GenerateJWTToken(
 		ctx,
 		user,
 		app,
-		s.tokenTTL,
+		s.accessTokenTTL,
 		secret,
 	)
 	if err != nil {
@@ -173,7 +185,7 @@ type IsAdminDTO struct {
 //
 // If user doesn't exist, returns error ErrInvalidUserId
 func (s *Service) IsAdmin(ctx context.Context, dto IsAdminDTO) (bool, error) {
-	isAdmin, err := s.userRepo.IsAdmin(ctx, dto.UserId)
+	_, err := s.adminRepo.GetAdmin(ctx, dto.UserId)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
 			return false, fmt.Errorf("failed to check if user is admin: %w", ErrInvalidUserId)
@@ -182,5 +194,5 @@ func (s *Service) IsAdmin(ctx context.Context, dto IsAdminDTO) (bool, error) {
 		return false, fmt.Errorf("failed to check if user is admin: %w", err)
 	}
 
-	return isAdmin, nil
+	return true, nil
 }

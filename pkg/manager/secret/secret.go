@@ -9,7 +9,7 @@ import (
 type Manager struct{}
 
 func (m *Manager) GetSecret(ctx context.Context, appID int) (string, error) {
-	secret := os.Getenv(fmt.Sprintf("APP%d_SECRET_KEY", appID))
+	secret := os.Getenv(fmt.Sprintf("APP%d_SECRET", appID))
 	if secret == "" {
 		return "", fmt.Errorf("secret not found")
 	}

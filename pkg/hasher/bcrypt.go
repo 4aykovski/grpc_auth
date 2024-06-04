@@ -4,7 +4,7 @@ import "golang.org/x/crypto/bcrypt"
 
 type BCrypt struct{}
 
-func (b *BCrypt) HashPassword(password string) (string, error) {
+func (b *BCrypt) Hash(password string) (string, error) {
 	passHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err

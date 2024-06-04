@@ -21,21 +21,25 @@ func main() {
 	log.Debug("GRPC Configuration", slog.String("host", cfg.GRPC.Host), slog.Int("port", cfg.GRPC.Port), slog.Duration("timeout", cfg.GRPC.Timeout))
 	log.Debug("Postgres Configuration", slog.String("host", cfg.Postgres.Host), slog.Int("port", cfg.Postgres.Port), slog.String("database", cfg.Postgres.Database))
 
-	application := app.New(
+	application, err := app.New(
 		log,
-		cfg.GRPC.Port,
 		cfg.Postgres.DSNTemplate,
+		cfg.GRPC.Port,
 		cfg.AccessTokenTtl,
 		cfg.RefreshTokenTtl,
 	)
+	if err != nil {
+		log.Error("failed to initialize application", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
 
-	go application.GRPCServer.MustRun()
+	go application.GRPCApp.MustRun()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 
 	sign := <-stop
 	log.Info("Stopping sso service", slog.String("signal", sign.String()))
-	application.GRPCServer.Stop()
+	application.GRPCApp.Stop()
 	log.Info("sso service stopped")
 }

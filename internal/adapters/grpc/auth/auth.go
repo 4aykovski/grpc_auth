@@ -2,7 +2,10 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
+	"strconv"
 	"strings"
 
 	ssov1 "github.com/4aykovski/grpc_auth_protos/gen/go/sso"
@@ -22,12 +25,15 @@ type AuthService interface {
 type serverAPI struct {
 	ssov1.UnimplementedAuthServer
 
+	log *slog.Logger
+
 	validate    *validator.Validate
 	authService AuthService
 }
 
-func Register(gRPC *grpc.Server, authService AuthService) {
+func Register(gRPC *grpc.Server, log *slog.Logger, authService AuthService) {
 	ssov1.RegisterAuthServer(gRPC, &serverAPI{
+		log:         log,
 		validate:    validator.New(),
 		authService: authService,
 	})
@@ -37,11 +43,16 @@ func (s *serverAPI) Login(
 	ctx context.Context,
 	req *ssov1.LoginRequest,
 ) (*ssov1.LoginResponse, error) {
+
+	log := s.log.With(slog.String("method", "Login"))
+
 	if err := validateLoginRequest(req, s.validate); err != nil {
 		var errMsgs []string
 		for _, err := range err {
 			errMsgs = append(errMsgs, err.Error())
 		}
+
+		log.Info("invalid login request", slog.String("error", strings.Join(errMsgs[:], ";")))
 
 		return nil, status.Error(codes.InvalidArgument, strings.Join(errMsgs[:], ";"))
 	}
@@ -52,9 +63,17 @@ func (s *serverAPI) Login(
 		AppId:    int(req.GetAppId()),
 	})
 	if err != nil {
-		// TODO: add error handling
+		if errors.Is(err, authservice.ErrInvalidCredentials) || errors.Is(err, authservice.ErrInvalidAppId) {
+			log.Info("invalid credentials")
+
+			return nil, status.Error(codes.Unauthenticated, "invalid credentials")
+		}
+		log.Error("failed to login", slog.String("email", req.GetEmail()), slog.String("error", err.Error()))
+
 		return nil, status.Error(codes.Internal, "internal error")
 	}
+
+	log.Info("login successful")
 
 	return &ssov1.LoginResponse{
 		Token: token,
@@ -65,11 +84,16 @@ func (s *serverAPI) Register(
 	ctx context.Context,
 	req *ssov1.RegisterRequest,
 ) (*ssov1.RegisterResponse, error) {
+
+	log := s.log.With(slog.String("method", "Register"))
+
 	if err := validateRegisterRequest(req, s.validate); err != nil {
 		var errMsgs []string
 		for _, err := range err {
 			errMsgs = append(errMsgs, err.Error())
 		}
+
+		log.Info("invalid register request", slog.String("error", strings.Join(errMsgs[:], ";")))
 
 		return nil, status.Error(codes.InvalidArgument, strings.Join(errMsgs[:], ";"))
 	}
@@ -79,9 +103,17 @@ func (s *serverAPI) Register(
 		Password: req.GetPassword(),
 	})
 	if err != nil {
-		// TODO: add error handling
+		if errors.Is(err, authservice.ErrUserAlreadyExists) {
+			log.Info("user already exists")
+
+			return nil, status.Error(codes.AlreadyExists, "user already exists")
+		}
+		log.Error("failed to register", slog.String("error", err.Error()))
+
 		return nil, status.Error(codes.Internal, "internal error")
 	}
+
+	log.Info("register successful")
 
 	return &ssov1.RegisterResponse{
 		UserId: userId,
@@ -92,22 +124,37 @@ func (s *serverAPI) IsAdmin(
 	ctx context.Context,
 	req *ssov1.IsAdminRequest,
 ) (*ssov1.IsAdminResponse, error) {
+
+	log := s.log.With(slog.String("method", "IsAdmin"))
+
 	if err := validateIsAdminRequest(req, s.validate); err != nil {
 		var errMsgs []string
 		for _, err := range err {
 			errMsgs = append(errMsgs, err.Error())
 		}
 
+		log.Info("invalid isAdmin request", slog.String("error", strings.Join(errMsgs[:], ";")))
+
 		return nil, status.Error(codes.InvalidArgument, strings.Join(errMsgs[:], ";"))
 	}
 
+	userId := int(req.GetUserId())
+
 	isAdmin, err := s.authService.IsAdmin(ctx, authservice.IsAdminDTO{
-		UserId: int(req.GetUserId()),
+		UserId: userId,
 	})
 	if err != nil {
-		// TODO: add error handling
+		if errors.Is(err, authservice.ErrInvalidUserId) {
+			log.Info("invalid userId", slog.String("userId", strconv.Itoa(userId)))
+
+			return nil, status.Error(codes.InvalidArgument, "invalid userId")
+		}
+		log.Error("failed to check isAdmin", slog.String("userId", strconv.Itoa(userId)), slog.String("error", err.Error()))
+
 		return nil, status.Error(codes.Internal, "internal error")
 	}
+
+	log.Info("isAdmin check successful", slog.String("userId", strconv.Itoa(userId)), slog.Bool("isAdmin", isAdmin))
 
 	return &ssov1.IsAdminResponse{
 		IsAdmin: isAdmin,
