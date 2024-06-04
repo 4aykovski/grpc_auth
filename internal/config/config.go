@@ -34,8 +34,15 @@ type Grpc struct {
 	Timeout time.Duration `env-required:"true" yaml:"timeout"`
 }
 
-func MustLoad() *Config {
-	err := godotenv.Load()
+// MustLoad loads config from .env and yaml file
+//
+// envPath is ".env" by default
+func MustLoad(envPath string) *Config {
+	if envPath == "" {
+		envPath = ".env"
+	}
+
+	err := godotenv.Load(envPath)
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}

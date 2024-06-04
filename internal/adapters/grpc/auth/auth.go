@@ -176,7 +176,7 @@ func validateLoginRequest(req *ssov1.LoginRequest, validate *validator.Validate)
 
 	appId := req.GetAppId()
 	if err := validate.Var(appId, "required"); err != nil {
-		errs = append(errs, fmt.Errorf("invalid appId"))
+		errs = append(errs, fmt.Errorf("invalid app id"))
 	}
 
 	return errs

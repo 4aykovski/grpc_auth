@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	cfg := config.MustLoad()
+	cfg := config.MustLoad("")
 
 	log := logger.InitLogger(cfg.Env)
 
