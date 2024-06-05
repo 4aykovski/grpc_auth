@@ -1,0 +1,33 @@
+version: "3"
+
+
+tasks:
+  sso-run:
+    desc: "run sso server"
+    cmds:
+      - go run ./cmd/sso/main.go
+  sso-pprun:
+    desc: "run sso server with pplog"
+    cmds:
+      - pplog go run ./cmd/sso/main.go
+  goose-up:
+    desc: "run goose migrations"
+    dotenv: ['.env']
+    cmds:
+      - goose -dir ./migrations postgres "host=$PG_HOST user=$PG_USER password=$PG_PASS dbname=$PG_DBNAME port=$PG_PORT sslmode=$PG_SSLMODE" up
+  goose-up-tests:
+    desc: "run standard migrations and tests"
+    dotenv: ['.env.tests']
+    cmds: 
+      - goose -dir ./migrations postgres "host=$PG_HOST user=$PG_USER password=$PG_PASS dbname=$PG_DBNAME port=$PG_PORT sslmode=$PG_SSLMODE" up
+      - goose -dir ./tests/migrations postgres "host=$PG_HOST user=$PG_USER password=$PG_PASS dbname=$PG_DBNAME port=$PG_PORT sslmode=$PG_SSLMODE" up
+  tests:
+    desc: "run tests"
+    deps: ["goose-up-tests"]
+    cmds:
+      - go test ./...
+  tests-v:
+    desc: "run tests with full description"
+    deps: ["goose-up-tests"]
+    cmds:
+      - go test ./... -v
